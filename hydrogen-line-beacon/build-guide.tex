@@ -1,0 +1,982 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=25mm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+\usepackage{xcolor}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{parskip}
+\usepackage{lastpage}
+\usepackage{graphicx}
+\usepackage{textcomp}
+
+% ── Page style ──
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\small Hydrogen Line Beacon}
+\fancyhead[R]{\small Mikoshi Ltd}
+\fancyfoot[C]{\small Hydrogen Line Beacon --- Build Guide --- Mikoshi Ltd --- Page \thepage\ of \pageref{LastPage}}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ── Listings ──
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  breakatwhitespace=false,
+  frame=single,
+  backgroundcolor=\color{gray!8},
+  rulecolor=\color{gray!40},
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  aboveskip=8pt,
+  belowskip=8pt,
+  columns=fullflexible,
+  keepspaces=true,
+  literate={→}{{$\rightarrow$}}1
+           {←}{{$\leftarrow$}}1
+           {↑}{{$\uparrow$}}1
+           {✓}{{$\checkmark$}}1
+           {✗}{{x}}1
+           {▼}{{v}}1
+           {●}{{*}}1
+}
+
+\lstdefinestyle{diagram}{
+  basicstyle=\ttfamily\footnotesize,
+  frame=single,
+  backgroundcolor=\color{gray!5},
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+}
+
+\begin{document}
+
+% ── Title ──
+\begin{center}
+{\LARGE\bfseries Hydrogen Line Beacon}\\[6pt]
+{\Large Complete Build Guide}\\[12pt]
+{\large Full hardware assembly, wiring, and deployment instructions.}\\[12pt]
+{\large\textbf{Mikoshi Ltd --- February 2026}}\\[6pt]
+\end{center}
+
+\tableofcontents
+\newpage
+
+%% ============================================================
+\section{Overview}
+
+\subsection{What We're Building}
+
+A portable, field-deployable dual-channel signal system controlled by a Raspberry Pi~5:
+
+\begin{lstlisting}[style=diagram]
++-------------------------------------------------------------+
+|                    RASPBERRY PI 5                            |
+|                                                              |
+|  +----------+  +----------+  +----------+  +-----------+    |
+|  | Protocol |  | Waveform |  | Monitor  |  |  Logger   |    |
+|  | Engine   |  | Generator|  | (SDR RX) |  |  (JSON)   |    |
+|  +----+-----+  +----+-----+  +----+-----+  +-----------+    |
+|       |              |              |                         |
++-------+--------------+--------------+------------------------+
+        |              |              |
+   +----v----+    +----v----+   +----v----+
+   | USB 3.0 |    |  I2S    |   | USB 2.0 |
+   +----+----+    +----+----+   +----+----+
+        |              |              |
+   +----v----+    +----v----+   +----v----+
+   | HackRF  |    |PCM5102A |   | RTL-SDR |
+   |  One    |    |  DAC    |   |   v4    |
+   +----+----+    +----+----+   +----+----+
+        |              |              |
+   +----v----+    +----v----+   +----v----+
+   |Helical  |    |TPA3116  |   |Discone  |
+   |Antenna  |    |  Amp    |   |Antenna  |
+   |(TX)     |    +----+----+   |(RX)     |
+   +---------+    +----v----+   +---------+
+                  |  Bass   |
+        EM        | Shaker  |      EM
+      Radiation   +----+----+   Reception
+                  +----v----+
+                  | Ground  |
+                  |  Plate  |
+                  +----+----+
+                  +----v----+
+                  | Ground  |
+                  |  Spike  |
+                  +---------+
+                   Seismic
+                    Wave
+\end{lstlisting}
+
+\subsection{What Goes Where}
+
+\begin{longtable}{llll}
+\toprule
+\textbf{Component} & \textbf{Connects To} & \textbf{Channel} & \textbf{Purpose} \\
+\midrule
+\endhead
+Raspberry Pi 5        & Everything       & Controller  & Runs all software \\
+HackRF One            & Pi USB 3.0       & RF TX       & Transmits hydrogen line signal \\
+Helical antenna       & HackRF SMA       & RF TX       & Radiates EM signal \\
+PCM5102A DAC          & Pi GPIO (I2S)    & Mechanical  & Converts digital to analogue \\
+TPA3116D2 amp         & DAC output       & Mechanical  & Amplifies signal for shaker \\
+Bass shaker           & Amp output       & Mechanical  & Converts electrical to vibration \\
+Ground plate          & Shaker mount     & Mechanical  & Transfers vibration to earth \\
+Ground spike          & Plate underside  & Mechanical  & Couples to soil \\
+RTL-SDR v4            & Pi USB 2.0       & Monitor     & Receives EM for analysis \\
+Discone antenna       & RTL-SDR SMA      & Monitor     & Wideband EM reception \\
+USB magnetometer      & Pi USB           & Monitor     & Magnetic field anomalies \\
+Pi Camera             & Pi CSI           & Monitor     & Sky observation \\
+\bottomrule
+\end{longtable}
+
+
+%% ============================================================
+\section{Bill of Materials}
+
+\subsection{Tier 1: Mechanical Only (\textasciitilde\pounds150)}
+
+No RF, no licence needed. Ground transduction only.
+
+\begin{longtable}{clllr}
+\toprule
+\textbf{\#} & \textbf{Item} & \textbf{Model / Spec} & \textbf{Where to Buy} & \textbf{Est.\ Cost} \\
+\midrule
+\endhead
+1  & Raspberry Pi 5 (4GB)  & BCM2712, 4GB RAM           & The Pi Hut / Pimoroni     & \pounds50 \\
+2  & Pi 5 power supply     & USB-C 27W (5V/5A)          & The Pi Hut                & \pounds12 \\
+3  & MicroSD card          & 32GB+ Class 10 / A2         & Amazon                    & \pounds8 \\
+4  & I2S DAC board         & PCM5102A breakout            & Amazon / AliExpress       & \pounds8 \\
+5  & Class D amplifier     & TPA3116D2 2-ch 50W           & Amazon                    & \pounds12 \\
+6  & 12V power supply      & 12V 3A DC adapter            & Amazon                    & \pounds8 \\
+7  & Bass shaker           & Dayton Audio BST-1 (10W)     & Parts Express / Amazon    & \pounds25 \\
+8  & Ground plate          & 400mm aluminium disc, 6mm    & eBay / metals4U           & \pounds20 \\
+9  & Ground spike          & 300mm steel rod, 12mm dia    & Screwfix                  & \pounds5 \\
+10 & Speaker wire          & 14 AWG, 5m                   & Amazon                    & \pounds6 \\
+11 & Jumper wires          & F--F dupont, 20cm            & Amazon                    & \pounds3 \\
+12 & M4 bolts + nuts       & For mounting shaker          & Screwfix                  & \pounds3 \\
+   &                       &                              & \textbf{Total}            & \textbf{\textasciitilde\pounds160} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Tier 2: Full Build (\textasciitilde\pounds530)}
+
+Everything above, plus RF and monitoring.
+
+\begin{longtable}{clllr}
+\toprule
+\textbf{\#} & \textbf{Item} & \textbf{Model / Spec} & \textbf{Where to Buy} & \textbf{Est.\ Cost} \\
+\midrule
+\endhead
+13 & HackRF One            & Great Scott Gadgets, 1--6\,GHz & Lab401 / Amazon       & \pounds250 \\
+14 & Helical antenna       & 1.42\,GHz RHCP, SMA            & eBay / DIY            & \pounds40 \\
+15 & SMA cable (TX)        & SMA M--M, 1m, RG316             & Amazon                & \pounds8 \\
+16 & RTL-SDR v4            & RTL2832U + R828D, SMA            & rtl-sdr.com           & \pounds30 \\
+17 & Discone antenna       & 25\,MHz--1.3\,GHz wideband       & Amazon / Moonraker    & \pounds40 \\
+18 & SMA cable (RX)        & SMA M--M, 1m, RG316             & Amazon                & \pounds8 \\
+19 & USB magnetometer      & RM3100 or HMC5883L              & Amazon / AliExpress   & \pounds15 \\
+20 & Pi Camera Module 3    & 12MP, autofocus, wide            & The Pi Hut            & \pounds30 \\
+   &                       &                                  & \textbf{Tier 2 adds}  & \textbf{\textasciitilde\pounds421} \\
+   &                       &                                  & \textbf{Full total}   & \textbf{\textasciitilde\pounds530} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Tier 3: Field Portable (\textasciitilde\pounds600)}
+
+Everything above, plus battery power and case.
+
+\begin{longtable}{clllr}
+\toprule
+\textbf{\#} & \textbf{Item} & \textbf{Model / Spec} & \textbf{Where to Buy} & \textbf{Est.\ Cost} \\
+\midrule
+\endhead
+21 & 12V LiFePO4 battery   & 6Ah+ (powers amp + Pi)     & Amazon                & \pounds40 \\
+22 & 12V to 5V USB-C conv. & Buck converter for Pi      & Amazon                & \pounds8 \\
+23 & Pelican-style case     & IP67, \textasciitilde400$\times$300$\times$150mm & Amazon / Screwfix & \pounds30 \\
+24 & Cable glands           & PG9/PG11, waterproof       & Amazon                & \pounds5 \\
+   &                        &                            & \textbf{Field adds}   & \textbf{\textasciitilde\pounds83} \\
+   &                        &                            & \textbf{Grand total}  & \textbf{\textasciitilde\pounds613} \\
+\bottomrule
+\end{longtable}
+
+
+%% ============================================================
+\section{Tier 1: Mechanical Only Build}
+
+This is the simplest build. No RF, no licence, no SDR.
+
+\subsection{What You Get}
+
+\begin{itemize}
+  \item Schumann resonance frequencies (7.83--33.8\,Hz) coupled directly into the ground
+  \item Prime-number pulse timing
+  \item Multiple signal programmes
+  \item Full protocol logging
+\end{itemize}
+
+\subsection{Signal Path}
+
+\begin{lstlisting}
+Pi 5 GPIO (I2S) -> PCM5102A DAC -> TPA3116D2 Amp -> Bass Shaker -> Ground Plate -> Earth
+\end{lstlisting}
+
+
+%% ============================================================
+\section{Tier 2: Full Build}
+
+Adds RF transmission, EM monitoring, and anomaly detection.
+
+\subsection{What You Get}
+
+Everything in Tier~1, plus:
+
+\begin{itemize}
+  \item 1.42\,GHz hydrogen line transmission (or ISM-legal 433/868\,MHz)
+  \item Schumann AM modulation on RF carrier
+  \item Wideband EM monitoring with anomaly detection
+  \item Magnetic field monitoring
+  \item Sky camera
+  \item Call-and-response protocol with automatic adaptation
+\end{itemize}
+
+
+%% ============================================================
+\section{Raspberry Pi 5 Setup}
+
+\subsection{Flash the OS}
+
+\begin{enumerate}
+  \item Download \textbf{Raspberry Pi Imager} from raspberrypi.com
+  \item Insert microSD card into your computer
+  \item Select \textbf{Raspberry Pi OS (64-bit, Bookworm)}
+  \item Click the gear icon and configure:
+    \begin{itemize}
+      \item Hostname: \texttt{hlb}
+      \item Enable SSH (password or key)
+      \item Set username: \texttt{pi}
+      \item Set password
+      \item Configure WiFi (your network SSID + password)
+    \end{itemize}
+  \item Write to SD card
+  \item Insert SD into Pi~5, connect power
+\end{enumerate}
+
+\subsection{First Boot}
+
+\begin{lstlisting}[language=bash]
+# SSH in
+ssh pi@hlb.local
+# or
+ssh pi@<ip-address>
+
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install system dependencies
+sudo apt install -y \
+    python3-pip \
+    python3-numpy \
+    python3-scipy \
+    git \
+    alsa-utils \
+    libportaudio2
+
+# Enable I2S (for DAC)
+sudo raspi-config
+# -> Interface Options -> I2S -> Enable
+# Reboot when prompted
+\end{lstlisting}
+
+\subsection{Enable I2S Audio Output}
+
+Edit the boot config:
+
+\begin{lstlisting}[language=bash]
+sudo nano /boot/firmware/config.txt
+\end{lstlisting}
+
+Add these lines at the end:
+
+\begin{lstlisting}
+# I2S DAC output
+dtoverlay=hifiberry-dac
+dtoverlay=i2s-mmap
+\end{lstlisting}
+
+Edit ALSA config to use the DAC:
+
+\begin{lstlisting}[language=bash]
+sudo nano /etc/asound.conf
+\end{lstlisting}
+
+Add:
+
+\begin{lstlisting}
+pcm.!default {
+    type hw
+    card 0
+}
+
+ctl.!default {
+    type hw
+    card 0
+}
+\end{lstlisting}
+
+Reboot:
+
+\begin{lstlisting}[language=bash]
+sudo reboot
+\end{lstlisting}
+
+Verify the DAC appears:
+
+\begin{lstlisting}[language=bash]
+aplay -l
+# Should show the I2S/HiFiBerry device
+\end{lstlisting}
+
+
+%% ============================================================
+\section{Software Installation}
+
+\subsection{Clone the Repository}
+
+\begin{lstlisting}[language=bash]
+cd ~
+git clone https://github.com/DarrenEdwards111/UAP_Dog_Whistle.git
+cd UAP_Dog_Whistle/hydrogen-line-beacon
+\end{lstlisting}
+
+\subsection{Install the Package}
+
+\begin{lstlisting}[language=bash]
+pip3 install -e . --break-system-packages
+\end{lstlisting}
+
+\subsection{Verify Installation}
+
+\begin{lstlisting}[language=bash]
+hlb --check
+\end{lstlisting}
+
+Expected output (Tier~1):
+\begin{lstlisting}
+Hardware check:
+  HackRF One:    x Not found
+  RTL-SDR:       x Not found
+  Audio (aplay): OK Available
+\end{lstlisting}
+
+\subsection{Install HackRF Tools (Tier 2 only)}
+
+\begin{lstlisting}[language=bash]
+sudo apt install -y hackrf libhackrf-dev
+
+# Verify
+hackrf_info
+# Should show "Found HackRF" with serial number
+\end{lstlisting}
+
+\subsection{Install RTL-SDR Tools (Tier 2 only)}
+
+\begin{lstlisting}[language=bash]
+sudo apt install -y rtl-sdr librtlsdr-dev
+
+# Blacklist default DVB-T driver (conflicts with SDR use)
+echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl.conf
+sudo modprobe -r dvb_usb_rtl28xxu
+
+# Verify
+rtl_test -t
+# Should show "Found 1 device(s)"
+\end{lstlisting}
+
+
+%% ============================================================
+\section{Channel 1: Mechanical Assembly}
+
+\subsection{Wiring the DAC}
+
+The PCM5102A connects to the Pi~5's GPIO header via I2S:
+
+\begin{lstlisting}[style=diagram]
+PCM5102A Board          Raspberry Pi 5 GPIO
+--------------          -------------------
+VIN  ------------------- Pin 1  (3.3V)
+GND  ------------------- Pin 6  (GND)
+BCK  ------------------- Pin 12 (GPIO 18 -- I2S BCLK)
+LCK  ------------------- Pin 35 (GPIO 19 -- I2S LRCLK)
+DIN  ------------------- Pin 40 (GPIO 21 -- I2S DOUT)
+\end{lstlisting}
+
+Some PCM5102A boards also have:
+\begin{lstlisting}[style=diagram]
+FLT  ------------------- GND (normal filter)
+DMP  ------------------- GND (de-emphasis off)
+FMT  ------------------- GND (I2S format)
+SCL  ------------------- Leave unconnected (or GND)
+XMT  ------------------- 3.3V (unmute)
+\end{lstlisting}
+
+\subsection{Wiring the Amplifier}
+
+\begin{lstlisting}[style=diagram]
+PCM5102A                TPA3116D2 Amplifier
+--------                -------------------
+L OUT ------------------- L IN
+GND   ------------------- GND
+
+12V DC Supply           TPA3116D2 Amplifier
+-------------           -------------------
++12V  ------------------- VCC / V+
+GND   ------------------- GND
+
+TPA3116D2 Amplifier     Bass Shaker
+-------------------     -----------
+L OUT+ ------------------- + (red)
+L OUT- ------------------- - (black)
+\end{lstlisting}
+
+\textbf{Important:} The amplifier runs on 12V DC, NOT from the Pi's 5V. Use a separate 12V power supply or 12V battery.
+
+\subsection{Assembling the Ground Coupler}
+
+\begin{lstlisting}[style=diagram]
+        +---------------------+
+        |    Bass Shaker      |
+        |   (Dayton BST-1)    |
+        |                     |
+        |  +---+   +---+     |  <- 4x M4 bolts through
+        |  |M4 |   |M4 |     |     shaker mounting holes
+        |  +---+   +---+     |
+        +---------------------+
+                |
+        +-------v-------------+
+        |                     |
+        |   Aluminium Plate   |  <- 400mm diameter, 6mm thick
+        |   (ground plate)    |     Drill 4x M4 holes to match
+        |                     |
+        +----------+----------+
+                   |
+              +----v----+
+              | Ground  |  <- 300mm steel rod, 12mm dia
+              |  Spike  |     Welded/bolted to plate centre
+              |         |     Drives into soil
+              +---------+
+\end{lstlisting}
+
+\textbf{Assembly steps:}
+
+\begin{enumerate}
+  \item \textbf{Drill mounting holes} in the aluminium plate to match the bass shaker's bolt pattern (usually 4 holes in a square).
+  \item \textbf{Bolt the shaker} to the centre of the plate using M4 bolts, washers, and lock nuts. Tighten firmly---vibration will loosen anything that isn't locked.
+  \item \textbf{Attach the ground spike} to the underside of the plate:
+    \begin{itemize}
+      \item \textbf{Option A (best):} Weld the steel rod perpendicular to the plate centre
+      \item \textbf{Option B:} Drill a 12mm hole through the plate, push the rod through, secure with nuts on both sides
+      \item \textbf{Option C:} Use a heavy-duty U-bolt to clamp the rod to the plate underside
+    \end{itemize}
+  \item \textbf{Connect speaker wire} from the amplifier to the shaker terminals.
+\end{enumerate}
+
+\subsection{Testing the Mechanical Channel}
+
+\begin{lstlisting}[language=bash]
+# Generate a 10-second test file
+hlb --generate /tmp/test.wav --duration 10 --programme fundamental
+
+# Play it
+aplay /tmp/test.wav
+
+# You should feel 7.83 Hz vibration through the plate
+# It won't be audible -- it's below human hearing
+# Place your hand on the plate to feel it
+\end{lstlisting}
+
+
+%% ============================================================
+\section{Channel 2: RF Assembly}
+
+\subsection{HackRF One Connection}
+
+Simple---USB cable:
+
+\begin{lstlisting}[style=diagram]
+Raspberry Pi 5          HackRF One
+--------------          ----------
+USB 3.0 port ---------- USB-C port (use the blue USB port on Pi)
+\end{lstlisting}
+
+\subsection{Helical Antenna for 1.42\,GHz}
+
+A circularly polarised helical antenna is ideal for hydrogen line work. You can buy one or build one.
+
+\textbf{DIY Helical Antenna (1.42\,GHz, RHCP):}
+
+\begin{lstlisting}[style=diagram]
+Materials:
+  - 2mm copper wire, ~2m length
+  - PVC pipe, 67mm diameter, 300mm long
+  - SMA female chassis connector
+  - Ground plane: 150mm x 150mm aluminium sheet
+  - 4mm wooden dowel (winding guide)
+
+Dimensions (for 1.42 GHz):
+  Circumference:    C = lambda = 211mm (wire on 67mm PVC pipe)
+  Spacing:          S = lambda/4 = 53mm between turns
+  Number of turns:  N = 6 (gives ~12 dBi gain)
+  Total height:     H = N x S = 318mm
+  Wire length:      L = N x C = 1,266mm
+  Ground plane:     >= 0.75 lambda x 0.75 lambda = 158mm x 158mm
+\end{lstlisting}
+
+\begin{lstlisting}[style=diagram]
+        ^ Direction of radiation
+        |
+    +---+---+
+    | +-+-+ |   <- Turn 6 (top)
+    | | | | |
+    | +-+-+ |   <- Turn 5
+    | | | | |
+    | +-+-+ |   <- Turn 4
+    | | | | |        53mm spacing
+    | +-+-+ |   <- Turn 3
+    | | | | |
+    | +-+-+ |   <- Turn 2
+    | | | | |
+    | +-+-+ |   <- Turn 1 (feed)
+    |   |   |
+    +---+---+
+   +----+--------+
+   |    *        |  <- SMA connector (centre pin to wire)
+   |  Ground     |  <- 150mm x 150mm aluminium
+   |  Plane      |
+   +-------------+
+\end{lstlisting}
+
+\textbf{Or buy:} Search eBay/Amazon for ``1420\,MHz helical antenna'' or ``hydrogen line antenna''---radio astronomy hobbyists sell these for \pounds30--60.
+
+\subsection{SMA Connections}
+
+\begin{lstlisting}[style=diagram]
+HackRF One (SMA female) ---- SMA cable (M-M, 1m) ---- Antenna (SMA female)
+\end{lstlisting}
+
+Use RG316 or RG58 cable. Keep it short---every metre of cable loses \textasciitilde0.5\,dB at 1.4\,GHz.
+
+\subsection{Testing the RF Channel}
+
+\begin{lstlisting}[language=bash]
+# Generate a 10-second baseband file
+hlb --generate-rf /tmp/test.iq
+
+# Verify HackRF
+hackrf_info
+
+# Test transmit (433 MHz ISM -- legal, safe)
+hackrf_transfer -t /tmp/test.iq -f 433920000 -s 2000000 -x 10
+
+# Stop with Ctrl+C
+\end{lstlisting}
+
+\textbf{Warning:} Do not transmit on 1.42\,GHz without a ham licence. Use 433\,MHz for testing.
+
+
+%% ============================================================
+\section{Monitoring Station Assembly}
+
+\subsection{RTL-SDR Receiver}
+
+\begin{lstlisting}[style=diagram]
+Raspberry Pi 5          RTL-SDR v4
+--------------          ----------
+USB 2.0 port ---------- USB-A connector
+
+RTL-SDR v4 (SMA)        Discone Antenna
+-----------------        ---------------
+SMA female ------------- SMA cable ----- Antenna base
+\end{lstlisting}
+
+The discone antenna should be mounted as high as possible---ideally on a tripod or mast, minimum 2m above ground.
+
+\subsection{USB Magnetometer (Optional)}
+
+\begin{lstlisting}[style=diagram]
+Raspberry Pi 5          RM3100 / HMC5883L
+--------------          -----------------
+USB port     ---------- USB breakout board
+\end{lstlisting}
+
+Or via I2C if using a bare breakout:
+
+\begin{lstlisting}[style=diagram]
+RM3100 Board            Raspberry Pi 5 GPIO
+------------            -------------------
+VIN  ------------------- Pin 17 (3.3V)
+GND  ------------------- Pin 9  (GND)
+SDA  ------------------- Pin 3  (GPIO 2 -- I2C SDA)
+SCL  ------------------- Pin 5  (GPIO 3 -- I2C SCL)
+\end{lstlisting}
+
+\subsection{Pi Camera (Optional)}
+
+\begin{lstlisting}[style=diagram]
+Pi Camera Module 3 (ribbon cable) -> Pi 5 CSI connector
+\end{lstlisting}
+
+\begin{enumerate}
+  \item Lift the CSI connector latch on the Pi
+  \item Insert the ribbon cable (contacts facing the board)
+  \item Press the latch down
+\end{enumerate}
+
+Test:
+\begin{lstlisting}[language=bash]
+rpicam-still -o test.jpg
+\end{lstlisting}
+
+
+%% ============================================================
+\section{Field Deployment}
+
+\subsection{Site Selection}
+
+\textbf{Ideal characteristics:}
+\begin{itemize}
+  \item Remote---minimal RF interference (away from cities, cell towers, WiFi)
+  \item Open sky---unobstructed view, no overhead powerlines
+  \item Soil ground---for spike coupling (not concrete/tarmac)
+  \item Dark---for visual observation (no light pollution)
+  \item Legal access---private land with permission, or public land where permitted
+\end{itemize}
+
+\textbf{UK suggestions:}
+\begin{itemize}
+  \item Brecon Beacons (dark sky reserve)
+  \item Gower Peninsula (Darren---this is right on your doorstep)
+  \item Snowdonia
+  \item Scottish Highlands
+  \item Any rural area away from major roads
+\end{itemize}
+
+\subsection{Setup Procedure}
+
+\begin{lstlisting}[style=diagram]
+Time: Allow 30 minutes for full setup
+
+1. CHOOSE LOCATION
+   - Flat ground, away from trees and structures
+   - Good soil for ground spike (not rocky)
+
+2. DEPLOY GROUND COUPLER
+   - Drive ground spike into soil (hammer it in ~200mm)
+   - Ensure plate sits flat and firm
+   - Run speaker wire to amplifier location (2-5m)
+
+3. SET UP ELECTRONICS
+   - Place Pi, amp, and battery in case (or on dry surface)
+   - Connect: DAC -> Amp -> Speaker wire -> Shaker
+   - Connect: 12V battery -> Amp
+   - Connect: 5V supply -> Pi
+
+4. DEPLOY ANTENNAS (Tier 2)
+   - TX antenna: mount on tripod, point upward
+   - RX antenna: mount on separate tripod, 5m+ from TX
+   - Connect SMA cables to HackRF and RTL-SDR
+   - Ensure antennas are >2m from people during operation
+
+5. POWER ON
+   - Boot Pi (takes ~30 seconds)
+   - SSH in: ssh pi@hlb.local
+
+6. CAPTURE BASELINE (Tier 2)
+   - Run: hlb --baseline
+   - Wait 2-3 minutes for baseline capture
+
+7. START PROTOCOL
+   - Tier 1: hlb --duration 3600
+   - Tier 2: hlb --rf --freq 433 --duration 3600
+   - Full:   hlb --rf --freq hydrogen --duration 3600
+\end{lstlisting}
+
+\subsection{Field Layout}
+
+\begin{lstlisting}[style=diagram]
+                    N
+                    ^
+                    |
+           +-------+-------+
+           |   TX Antenna   |  <- On tripod, 2m high
+           |   (Helical)    |    Pointed at sky
+           +-------+-------+
+                   | SMA cable (1m)
+                   |
+    +--------------+-------------------+
+    |         EQUIPMENT                |
+    |  +-----+ +------+ +-----+       |
+    |  |Pi 5 | |Amp   | |Batt |       |
+    |  |     | |12V   | |12V  |       |  <- In weatherproof case
+    |  |HackRF |TPA3116| |LiFe |       |
+    |  |RTL-SDR|      | |PO4  |       |
+    |  +--+--+ +--+---+ +-----+       |
+    |     |       |                    |
+    +-----+-------+--------------------+
+          |       |
+          |       | Speaker wire (3-5m)
+          |       |
+          |  +----v------+
+          |  |  Ground   |  <- Centre of deployment area
+          |  |  Plate +  |    Spike driven into soil
+          |  |  Shaker   |
+          |  +-----------+
+          |
+          | SMA cable (5m)
+          |
+    +-----v-----+
+    | RX Antenna |  <- On separate tripod, 5m+ from TX
+    | (Discone)  |    2m+ high
+    +-----------+
+
+
+    OBSERVER: 10m+ from equipment
+    +---------+
+    |  You    |  <- Laptop with SSH, or just let it run
+    |  (here) |    Bring chair, thermos, binoculars, camera
+    +---------+
+\end{lstlisting}
+
+
+%% ============================================================
+\section{Operating Procedures}
+
+\subsection{Standard Session}
+
+\begin{lstlisting}[language=bash]
+# SSH into Pi
+ssh pi@hlb.local
+
+# Quick check
+hlb --check
+
+# Start (1 hour, mechanical only)
+hlb --duration 3600
+
+# Start (1 hour, full protocol, 433 MHz ISM legal)
+hlb --rf --freq 433 --duration 3600
+
+# Start (1 hour, full protocol, hydrogen line -- REQUIRES HAM LICENCE)
+hlb --rf --freq hydrogen --duration 3600
+\end{lstlisting}
+
+\subsection{Automated Session (systemd)}
+
+For unattended operation:
+
+\begin{lstlisting}[language=bash]
+# Create service file
+sudo tee /etc/systemd/system/hlb.service << 'EOF'
+[Unit]
+Description=Hydrogen Line Beacon
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi
+ExecStart=/home/pi/.local/bin/hlb --duration 7200 --programme full
+Restart=on-failure
+RestartSec=30
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable hlb.service
+sudo systemctl start hlb.service
+
+# Check status
+sudo systemctl status hlb.service
+
+# View logs
+journalctl -u hlb.service -f
+\end{lstlisting}
+
+\subsection{Reading the Logs}
+
+All events are logged to \texttt{./hlb\_logs/}:
+
+\begin{lstlisting}[language=bash]
+# Session summary
+cat hlb_logs/session_*.json | python3 -m json.tool
+
+# Event log (today)
+cat hlb_logs/events_$(date +%Y%m%d).jsonl
+
+# Count anomalies
+grep '"type": "anomaly"' hlb_logs/events_*.jsonl | wc -l
+\end{lstlisting}
+
+\subsection{What to Record Manually}
+
+Keep a field notebook (or phone notes) with:
+
+\begin{itemize}
+  \item Date, time, location (GPS coordinates)
+  \item Weather conditions (clear, cloudy, temperature, wind)
+  \item Moon phase
+  \item Programme used and duration
+  \item Any visual observations (lights, movement, anything unusual)
+  \item Any sounds or sensations
+  \item Any equipment anomalies (unexpected readings, interference)
+  \item Timestamps of anything interesting
+\end{itemize}
+
+
+%% ============================================================
+\section{Troubleshooting}
+
+\subsection{No sound from shaker}
+
+\begin{lstlisting}[language=bash]
+# Check audio output
+aplay -l
+# Should list the I2S DAC
+
+# Test with a tone
+speaker-test -t sine -f 100 -l 1
+# 100 Hz is audible -- if the shaker vibrates, wiring is correct
+
+# Check I2S is enabled
+cat /boot/firmware/config.txt | grep hifiberry
+# Should show: dtoverlay=hifiberry-dac
+\end{lstlisting}
+
+\subsection{HackRF not detected}
+
+\begin{lstlisting}[language=bash]
+# Check USB
+lsusb | grep -i hackrf
+# Should show: "Great Scott Gadgets HackRF One"
+
+# Check firmware
+hackrf_info
+# If error: try different USB cable or port
+
+# Permissions
+sudo usermod -aG plugdev pi
+# Then log out and back in
+\end{lstlisting}
+
+\subsection{RTL-SDR not detected}
+
+\begin{lstlisting}[language=bash]
+# Check USB
+lsusb | grep -i rtl
+# Should show: "Realtek Semiconductor Corp. RTL2838"
+
+# Check driver blacklist
+cat /etc/modprobe.d/blacklist-rtl.conf
+# Should show: blacklist dvb_usb_rtl28xxu
+
+# If the DVB driver loaded first:
+sudo modprobe -r dvb_usb_rtl28xxu
+sudo modprobe rtl2832_sdr
+\end{lstlisting}
+
+\subsection{Low signal / weak vibration}
+
+\begin{itemize}
+  \item \textbf{Check amplifier gain}---turn the potentiometer on the TPA3116D2
+  \item \textbf{Check 12V supply}---amp needs real 12V, not 5V from Pi
+  \item \textbf{Check shaker mounting}---must be bolted tight to plate, not just resting
+  \item \textbf{Check ground spike}---must be driven into real soil, not sitting on surface
+  \item \textbf{Check speaker wire}---14 AWG minimum, no breaks, good connections
+\end{itemize}
+
+\subsection{Protocol shows no anomalies}
+
+\begin{itemize}
+  \item This is normal---anomalies are rare events
+  \item Verify baseline was captured (check \texttt{hlb\_logs/baseline.json})
+  \item Try lowering threshold: edit config to \texttt{anomaly\_threshold: 2.0}
+  \item Ensure RX antenna is not too close to TX antenna ({>}5m separation)
+  \item Check RTL-SDR is actually receiving (run \texttt{rtl\_power} manually)
+\end{itemize}
+
+
+%% ============================================================
+\section{Safety}
+
+\subsection{RF Exposure}
+
+\begin{itemize}
+  \item Keep all people \textbf{{>}2m from the TX antenna} during transmission
+  \item At 100\,mW output, this distance provides a large safety margin
+  \item The HackRF One's maximum output is 15\,dBm (\textasciitilde30\,mW) which is well within safe limits
+  \item ISM band power limits are set specifically to be safe for incidental exposure
+\end{itemize}
+
+\subsection{Electrical}
+
+\begin{itemize}
+  \item The 12V amplifier circuit is low voltage and safe to touch
+  \item Do not expose electronics to rain---use a waterproof case or cover
+  \item Disconnect battery before modifying any wiring
+  \item Use appropriate fuses on the 12V circuit (3A)
+\end{itemize}
+
+\subsection{Infrasound}
+
+\begin{itemize}
+  \item The mechanical channel produces sub-20\,Hz vibrations
+  \item At the power levels used (10--50W shaker), these are well below harmful thresholds
+  \item You may feel a mild tingling or vibration standing near the plate---this is normal
+  \item Harmful infrasound levels ({>}120\,dB) require industrial equipment far beyond this build
+\end{itemize}
+
+\subsection{Lightning}
+
+\begin{itemize}
+  \item \textbf{Do not operate during thunderstorms}---the antennas are lightning attractors
+  \item Take down antennas if storms are approaching
+  \item Do not deploy on hilltops during unsettled weather
+\end{itemize}
+
+\subsection{UAP-Specific (per Skywatcher's Warnings)}
+
+\begin{itemize}
+  \item Skywatcher personnel report \textbf{historic injuries} from close UAP encounters including radiation exposure and directed energy
+  \item If anything anomalous appears \textbf{at close range}, do not approach
+  \item Consider bringing a \textbf{dosimeter} (radiation badge)---available for \textasciitilde\pounds20 on Amazon
+  \item Maintain minimum \textbf{50m distance} from any observed anomaly
+  \item Have a vehicle nearby for rapid departure if needed
+  \item Tell someone where you are and when you'll be back
+\end{itemize}
+
+\subsection{Legal}
+
+\begin{itemize}
+  \item \textbf{433\,MHz / 868\,MHz:} Legal in UK/EU without licence at specified power levels
+  \item \textbf{1.42\,GHz:} Requires amateur radio licence (Foundation minimum---\pounds50, one day)
+  \item \textbf{Run \texttt{hlb --legal} for full details}
+  \item You are responsible for compliance with Ofcom regulations
+\end{itemize}
+
+\vfill
+
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}\\[6pt]
+\textit{Mikoshi Ltd, 2026 --- MIT Licence}\\[4pt]
+\textcopyright{} 2026 Mikoshi Ltd. MIT Licence.
+\end{center}
+
+\end{document}

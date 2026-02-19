@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hydrogen-line-beacon"
+version = "0.1.0"
+description = "Dual-channel electromechanical signal system — RF + seismic ground transduction for the Raspberry Pi"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Mikoshi Ltd"}
+]
+keywords = ["hydrogen-line", "schumann", "sdr", "hackrf", "raspberry-pi", "signal-processing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+audio = ["sounddevice>=0.4"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+hlb = "hlb.cli:main"
+
+[project.urls]
+Repository = "https://github.com/DarrenEdwards111/UAP_Dog_Whistle"
+
+[tool.setuptools.packages.find]
+include = ["hlb*"]

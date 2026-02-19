@@ -1,0 +1,2 @@
+[console_scripts]
+hlb = hlb.cli:main

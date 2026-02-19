@@ -1,0 +1,8 @@
+numpy>=1.24
+scipy>=1.10
+
+[audio]
+sounddevice>=0.4
+
+[dev]
+pytest>=7.0
