@@ -1,6 +1,11 @@
 # SHARD
 ## Schumann Hydrogen Active RF Discovery
 
+[![PyPI version](https://badge.fury.io/py/shard-rf.svg)](https://badge.fury.io/py/shard-rf)
+[![Python](https://img.shields.io/pypi/pyversions/shard-rf.svg)](https://pypi.org/project/shard-rf/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Downloads](https://pepy.tech/badge/shard-rf)](https://pepy.tech/project/shard-rf)
+
 A collection of experimental signal processing and RF transmission tools focused on Earth's electromagnetic environment, particularly Schumann resonances and the hydrogen line.
 
 ## Projects

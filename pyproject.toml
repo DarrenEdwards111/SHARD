@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shard-rf"
+version = "1.0.0"
+description = "SHARD — Schumann Hydrogen Active RF Discovery. Sequential hypothesis testing for active RF anomaly detection."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+    {name = "Darren Edwards", email = "darrenedwards111@gmail.com"}
+]
+keywords = [
+    "shard",
+    "rf",
+    "schumann",
+    "hydrogen-line",
+    "active-discovery",
+    "sdr",
+    "radio",
+    "anomaly-detection",
+    "sprt",
+    "sequential-testing",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Communications :: Ham Radio",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+hardware = [
+    "pyrtlsdr>=0.2.93",
+]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+shard = "shard.active_beacon:main"
+
+[project.urls]
+Homepage = "https://github.com/DarrenEdwards111/SHARD"
+Repository = "https://github.com/DarrenEdwards111/SHARD"
+Issues = "https://github.com/DarrenEdwards111/SHARD/issues"
+
+[tool.setuptools.packages.find]
+include = ["shard*"]
+
+[tool.setuptools.package-data]
+shard = ["py.typed"]
