@@ -1,4 +1,5 @@
-# Atmospheric EM & RF Research Platform
+# SHARD
+## Schumann Hydrogen Active RF Discovery
 
 A collection of experimental signal processing and RF transmission tools focused on Earth's electromagnetic environment, particularly Schumann resonances and the hydrogen line.
 
