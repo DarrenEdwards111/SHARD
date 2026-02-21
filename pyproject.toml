@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shard-rf"
-version = "1.0.2"
+version = "1.0.5"
 description = "SHARD — Schumann Hydrogen Active RF Discovery. Sequential hypothesis testing for active RF anomaly detection."
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 requires-python = ">=3.9"
 authors = [
     {name = "Darren Edwards", email = "darrenedwards111@gmail.com"}
